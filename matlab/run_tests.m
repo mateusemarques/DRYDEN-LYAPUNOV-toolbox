@@ -21,5 +21,17 @@ p = dryden_params(V, 300, 'moderate');
 [Aa, Ba, Ca] = dl_augment(A, Bg, eye(2), p);
 rl = lyap_rms(Aa, Ba, Ca); mm = mc_rms(Aa, Ba, Ca, 0.01, 400, 16, 3);
 ok = dl_check(ok, all(abs(mm - rl)./rl < 0.05), 'Monte Carlo within 5% of Lyapunov');
+% 4) MLST: resonant peak, H2 and first-order Gramians
+wn = 2; z = 0.2; A2 = [0 1; -wn^2 -2*z*wn]; B2 = [0; wn^2]; C2 = [1 0];
+r = mlst_norms(A2, B2, C2, [5 50]); r0 = mlst_norms(A2, B2, C2, [1e-2 1e2]);
+ok = dl_check(ok, abs(r.Hinf - 1/(2*z*sqrt(1-z^2)))/r.Hinf < 1e-5, 'Hinf resonant peak');
+ok = dl_check(ok, abs(r.w_Hinf_band - 5) < 5e-3, 'Hinf band-limited search');
+ok = dl_check(ok, abs(r.H2 - sqrt(wn/(4*z))) < 1e-9, 'H2 closed form');
+[Wc, Wo] = mlst_gramians(-2, 3, 0.5);
+ok = dl_check(ok, abs(Wc - 9/4) < 1e-12 && abs(Wo - 0.25/4) < 1e-12, 'first-order Gramians');
+T = mlst_modal(A2, B2, C2);
+ok = dl_check(ok, numel(T) == 1 && abs(T.zeta - z) < 1e-9, 'complex pair merged');
+[~, ~, e] = mlst_gramians([0 1; 0 -1], [0; 1], [1 0]);
+ok = dl_check(ok, e > 0, 'marginal mode shifted');
 if ok, disp('ALL TESTS PASSED'); else, error('some tests failed'); end
 

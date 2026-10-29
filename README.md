@@ -2,6 +2,8 @@
 
 Dryden atmospheric turbulence (MIL-F-8785C / MIL-HDBK-1797) as state-space shaping filters, plus **steady-state RMS of any linear aircraft model by solving one Lyapunov equation**, with a Monte Carlo cross-check and band-limited variance (e.g. the pilot's 1–10 rad/s band).
 
+Since v0.2 it also has an **MLST module** (Multivariable Linear Systems Theory) for open-loop disturbance susceptibility: which modes the gusts reach, which ones show up in the pilot's outputs, and where the worst-case amplification sits in frequency.
+
 Same API in **Python** and **MATLAB/GNU Octave**. Both versions are tested and give identical Lyapunov results.
 
 ![Lyapunov vs Monte Carlo](docs/lyapunov_vs_mc.png)
@@ -24,6 +26,9 @@ and read the RMS of every state and output from the diagonal of $C_a P C_a^\top$
 | `lyapunov_rms` / `lyap_rms` | Steady-state RMS of every output from the Lyapunov equation |
 | `monte_carlo_rms` / `mc_rms` | Time-domain RMS over N seeds, exact (Van Loan) discretization of the noise |
 | `band_variance` (Python) | Fraction of each output's variance inside a frequency band, from the one-sided PSD |
+| `gramians` / `mlst_gramians` | Controllability and observability Gramians (with an automatic shift for marginal modes such as integrators) |
+| `modal_table` / `mlst_modal` | Per mode: wn, ζ, modal reachability from the gusts, visibility in the outputs, a combined index and the dominant state |
+| `hankel_sv`, `h2_norm`, `hinf_norm` / `mlst_norms` | Hankel singular values, H2 norm, H∞ peak and its frequency, globally and inside a band (e.g. 0.5–10 rad/s) |
 
 ## Quick start
 
@@ -32,8 +37,9 @@ and read the RMS of every state and output from the diagonal of $C_a P C_a^\top$
 ```bash
 cd python
 pip install -r requirements.txt
-python examples/short_period_example.py   # prints the table, writes docs/*.png
-python -m pytest -q tests                 # 17 tests
+python examples/short_period_example.py   # Dryden RMS: Lyapunov vs Monte Carlo
+python examples/mlst_example.py           # modal susceptibility, H2, H∞
+python -m pytest -q tests                 # 24 tests
 ```
 
 ```python
@@ -51,6 +57,7 @@ rms = lyapunov_rms(Aa, Ba, Ca)
 cd matlab
 run_tests               % PASS/FAIL checks
 example_short_period    % same case as the Python example
+example_mlst            % MLST module, same case as python/examples/mlst_example.py
 ```
 
 ## Noise convention (the factor-of-2 trap)
@@ -78,6 +85,23 @@ Monte Carlo (20 runs × 600 s, dt = 0.01 s) lands within about 1.5% of these in 
 
 ![PSD of q](docs/psd_q_band.png)
 
+## MLST example
+
+Generic longitudinal model (u, α, q, θ) at V = 150 m/s, gusts u_g and w_g in, q and θ out (illustrative values):
+
+| Mode | ωn (rad/s) | ζ | reach from gusts (norm.) | visible in q, θ (norm.) |
+|---|---|---|---|---|
+| phugoid | 0.081 | 0.075 | 1.00 | 0.050 |
+| short period | 1.650 | 0.516 | 0.0014 | 1.00 |
+
+The phugoid takes almost all the gust energy and sets the global H∞ peak (0.064 at 0.081 rad/s); inside the 0.5–10 rad/s pilot band the peak drops to 0.0094 at 1.51 rad/s, near the short period. Eigenvalues alone give damping, not this split between what the gusts excite and what the pilot sees.
+
+![sigma max](docs/mlst_sigma.png)
+
+## How the two halves connect
+
+The Gramian $W_c$ is the state covariance for unit-intensity white noise on the inputs, so $H_2 = \sqrt{\mathrm{tr}(C W_c C^\top)}$ is an RMS. Put the Dryden filters in front of the plant and the same Lyapunov solve gives the turbulence RMS in physical units: the MLST module ranks the channels, the Dryden module sizes them.
+
 ## Scope and limits
 
 - Frozen V and h (constant-coefficient filters), as in the handbook's Dryden form. Rotational gust terms (p_g, q_g, r_g) are not included.
@@ -89,11 +113,13 @@ Monte Carlo (20 runs × 600 s, dt = 0.01 s) lands within about 1.5% of these in 
 - MIL-F-8785C, *Flying Qualities of Piloted Airplanes*, 1980.
 - MIL-HDBK-1797, *Flying Qualities of Piloted Aircraft*, 1997.
 - B. L. Stevens, F. L. Lewis, E. N. Johnson, *Aircraft Control and Simulation*, 3rd ed., Wiley, 2016.
+- K. Zhou, J. C. Doyle, K. Glover, *Robust and Optimal Control*, Prentice Hall, 1996.
+- B. C. Moore, "Principal component analysis in linear systems: controllability, observability, and model reduction", *IEEE TAC* 26(1), 1981.
 - C. F. Van Loan, "Computing integrals involving the matrix exponential", *IEEE TAC* 23(3), 1978.
 
 ## Em português
 
-Toolbox de turbulência Dryden (MIL-F-8785C / MIL-HDBK-1797) com cálculo do RMS em regime de qualquer modelo linear de aeronave pela equação de Lyapunov, validado por Monte Carlo, em Python e MATLAB/Octave. Atenção à convenção do ruído: com intensidade π, cada filtro reproduz σ²; outras convenções mudam o resultado por √2 ou √π.
+Toolbox de turbulência Dryden (MIL-F-8785C / MIL-HDBK-1797) com cálculo do RMS em regime de qualquer modelo linear de aeronave pela equação de Lyapunov, validado por Monte Carlo, em Python e MATLAB/Octave. Desde a v0.2, inclui um módulo de Teoria de Sistemas Lineares Multivariáveis (gramianos, análise modal, valores singulares de Hankel, normas H2 e H∞ na banda do piloto) para avaliar a suscetibilidade a distúrbios em malha aberta. Atenção à convenção do ruído: com intensidade π, cada filtro reproduz σ²; outras convenções mudam o resultado por √2 ou √π.
 
 ## License
 
